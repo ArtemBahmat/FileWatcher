@@ -1,9 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using System.IO;
+using System.Threading;
 
 namespace FileWatcher
 {
@@ -11,34 +9,43 @@ namespace FileWatcher
 
     class Program
     {
-        public static event EventHandler _watch;
+        static object Locker = new object();
+        static TaskFactory TFactory = new TaskFactory();
+        static string FilePath = @"D:\file.txt";
 
         static void Main(string[] args)
         {
-            string path = @"D:\file.txt";
-            DateTime dt = File.GetLastWriteTime(path); //= new DateTime(1985, 4, 3);
-
-            if (!File.Exists(path))
+            if (!File.Exists(FilePath))
             {
-                File.Create(path);
+                File.Create(FilePath);
             }
 
-            _watch += new EventHandler(OnChanged);
-            _watch.Invoke(path, dt);
-            Console.ReadLine();
+            FileWatcher watcher = new FileWatcher(FilePath, Locker);
+            TFactory.StartNew(ChangeDigit);
+            watcher.OnChange += Changed;
+            watcher.OnChanged();
         }
 
-        static void OnChanged(string path, DateTime lastDt)
+        static void Changed()
+        {
+            Console.WriteLine("File changed");
+        }
+
+        static void ChangeDigit()
         {
             while (true)
             {
-                DateTime currentDt = File.GetLastWriteTime(path);
+                Console.WriteLine("Do you want to change file content to one? Y/N :");
+                string input = Console.ReadLine();
 
-                if (currentDt != lastDt)
+                if (input == "y" || input == "Y")
                 {
-                    lastDt = currentDt;
-                    Console.WriteLine("File was changed. New DateTime: " + currentDt.ToString("yyyy-MM-ddTHH:mm:ss.fff"));//.ToLongDateString());
+                    lock (Locker)
+                    {
+                        File.WriteAllText(FilePath, "1");
+                    }
                 }
+                Thread.Sleep(1000);
             }
         }
     }
